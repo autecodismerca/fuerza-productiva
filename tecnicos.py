@@ -66,7 +66,7 @@ menu = st.sidebar.selectbox(
         "Gestión de Técnicos",
         "Análisis por Técnico",
         "Informe Mensual",
-        "Exportar PDF"
+        "By RoelStar/2026"
     ]
 )
 
@@ -203,6 +203,23 @@ elif menu == "Dashboard Ejecutivo":
 
     st.dataframe(prod.sort_values("Mano_Obra",ascending=False))
 
+    # -----------------------------
+    # PARTICIPACIÓN REPUESTOS
+    # -----------------------------
+
+    st.subheader("Participación técnicos en venta de repuestos")
+
+    fig_pie = px.pie(
+        prod,
+        names="Tecnico",
+        values="Repuestos",
+        hole=0.4
+    )
+
+    fig_pie.update_traces(textposition="inside", textinfo="percent+label")
+
+    st.plotly_chart(fig_pie, use_container_width=True)
+
 # -----------------------------
 # INFORME MES A MES
 # -----------------------------
@@ -218,18 +235,19 @@ elif menu == "Informe Mensual":
 
     for mes in meses:
 
-        datos_mes = datos[datos["Mes"]==mes]
+        datos_mes = datos[datos["Mes"] == mes]
 
-        if len(datos_mes)>0:
+        if len(datos_mes) > 0:
 
             st.markdown(f"## {mes}")
 
             tabla = datos_mes.groupby("Tecnico")[["Mano_Obra","Repuestos"]].sum().reset_index()
 
-            tabla["Cumplimiento %"] = (tabla["Mano_Obra"]/META)*100
+            tabla["Cumplimiento %"] = (tabla["Mano_Obra"] / META) * 100
 
             st.dataframe(tabla)
 
+            # MANO DE OBRA
             fig = px.bar(
                 tabla,
                 x="Tecnico",
@@ -239,7 +257,19 @@ elif menu == "Informe Mensual":
                 color_continuous_scale="RdYlGn"
             )
 
-            st.plotly_chart(fig,use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
+
+            # REPUESTOS
+            fig_rep = px.bar(
+                tabla,
+                x="Tecnico",
+                y="Repuestos",
+                text="Repuestos",
+                color="Repuestos",
+                color_continuous_scale="Blues"
+            )
+
+            st.plotly_chart(fig_rep, use_container_width=True)  
 
 # -----------------------------
 # ANALISIS TECNICO
@@ -273,36 +303,3 @@ elif menu == "Análisis por Técnico":
     cumplimiento = (total / meta_acumulada) * 100
 
     st.metric("Cumplimiento total", f"{cumplimiento:.1f}%")
-# -----------------------------
-# EXPORTAR PDF
-# -----------------------------
-
-elif menu == "Exportar PDF":
-
-    if st.button("Generar informe"):
-
-        pdf = FPDF()
-        pdf.add_page()
-
-        pdf.set_font("Arial",size=14)
-
-        pdf.cell(200,10,"Informe Productividad Taller",ln=True)
-
-        total_mo = datos["Mano_Obra"].sum()
-        total_rep = datos["Repuestos"].sum()
-
-        pdf.set_font("Arial",size=12)
-
-        pdf.cell(200,10,f"Mano obra total: ${total_mo:,.0f}",ln=True)
-        pdf.cell(200,10,f"Repuestos total: ${total_rep:,.0f}",ln=True)
-        pdf.cell(200,10,f"Tecnicos: {len(tecnicos)}",ln=True)
-
-        pdf.output("informe.pdf")
-
-        with open("informe.pdf","rb") as f:
-
-            st.download_button(
-                "Descargar PDF",
-                f,
-                file_name="informe.pdf"
-            )
