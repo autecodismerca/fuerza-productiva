@@ -247,35 +247,32 @@ elif menu == "Informe Mensual":
 
 elif menu == "Análisis por Técnico":
 
-    tecnico = st.selectbox("Seleccionar técnico",tecnicos["Tecnico"])
+    tecnico = st.selectbox("Seleccionar técnico", tecnicos["Tecnico"])
 
-    datos_t = datos[datos["Tecnico"]==tecnico]
+    datos_t = datos[datos["Tecnico"] == tecnico]
 
-    if len(datos_t)==0:
+    if len(datos_t) == 0:
         st.warning("Sin datos")
         st.stop()
 
     fig = px.line(
         datos_t,
         x="Mes",
-        y=["Mano_Obra","Repuestos"],
+        y=["Mano_Obra", "Repuestos"],
         markers=True
     )
 
-    st.plotly_chart(fig,use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
 
     total = datos_t["Mano_Obra"].sum()
 
     meses_trabajados = datos["Mes"].nunique()
 
-    prod = datos.groupby("Tecnico")[["Mano_Obra","Repuestos"]].sum().reset_index()
-
     meta_acumulada = META * meses_trabajados
 
-    prod["Cumplimiento %"] = (prod["Mano_Obra"] / meta_acumulada) * 100
+    cumplimiento = (total / meta_acumulada) * 100
 
-    st.metric("Cumplimiento total",f"{cumplimiento:.1f}%")
-
+    st.metric("Cumplimiento total", f"{cumplimiento:.1f}%")
 # -----------------------------
 # EXPORTAR PDF
 # -----------------------------
