@@ -5,3 +5,4 @@ fpdf
 excel
 reportlab
 PyGithub
+plotly
