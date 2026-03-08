@@ -155,9 +155,13 @@ elif menu == "Dashboard Ejecutivo":
 
     st.divider()
 
+    meses_trabajados = datos["Mes"].nunique()
+
     prod = datos.groupby("Tecnico")[["Mano_Obra","Repuestos"]].sum().reset_index()
 
-    prod["Cumplimiento %"] = (prod["Mano_Obra"]/META)*100
+    meta_acumulada = META * meses_trabajados
+
+    prod["Cumplimiento %"] = (prod["Mano_Obra"] / meta_acumulada) * 100
 
     fig = px.bar(
         prod,
@@ -262,7 +266,13 @@ elif menu == "Análisis por Técnico":
 
     total = datos_t["Mano_Obra"].sum()
 
-    cumplimiento = (total/META)*100
+    meses_trabajados = datos["Mes"].nunique()
+
+    prod = datos.groupby("Tecnico")[["Mano_Obra","Repuestos"]].sum().reset_index()
+
+    meta_acumulada = META * meses_trabajados
+
+    prod["Cumplimiento %"] = (prod["Mano_Obra"] / meta_acumulada) * 100
 
     st.metric("Cumplimiento total",f"{cumplimiento:.1f}%")
 
