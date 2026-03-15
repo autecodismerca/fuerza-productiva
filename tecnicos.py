@@ -2,13 +2,17 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
-from fpdf import FPDF
 from PIL import Image
 
 st.set_page_config(page_title="Dashboard Postventa", layout="wide")
 
 META = 6600000
 archivo = "datos_taller.xlsx"
+
+orden_meses = [
+"Enero","Febrero","Marzo","Abril","Mayo","Junio",
+"Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+]
 
 # -----------------------------
 # CREAR BASE DE DATOS
@@ -22,14 +26,18 @@ if not os.path.exists(archivo):
         "Mes",
         "Tecnico",
         "Mano_Obra",
-        "Repuestos"
+        "Repuestos",
+        "Horas_Productivas",
+        "Horas_Laborales"
     ])
 
-    with pd.ExcelWriter(archivo) as writer:
+    with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
         tecnicos.to_excel(writer, sheet_name="tecnicos", index=False)
         datos.to_excel(writer, sheet_name="datos", index=False)
 
-# cargar datos
+# -----------------------------
+# CARGAR DATOS
+# -----------------------------
 
 tecnicos = pd.read_excel(archivo, sheet_name="tecnicos")
 datos = pd.read_excel(archivo, sheet_name="datos")
@@ -38,19 +46,15 @@ datos = pd.read_excel(archivo, sheet_name="datos")
 # HEADER
 # -----------------------------
 
-logo = Image.open("logo_empresa.png")
+col1,col2 = st.columns([2,4])
 
-col1, col2 = st.columns([2,4])
+try:
+    logo = Image.open("logo_empresa.png")
+    col1.image(logo,width=250)
+except:
+    pass
 
-with col1:
-    st.image(logo, width=250)
-
-with col2:
-        st.markdown("""
-    <h2 style='margin-bottom:0px; font-size:30px;'>
-    Productividad Postventa
-    </h2>
-    """, unsafe_allow_html=True)
+col2.markdown("<h2>Productividad Postventa</h2>",unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -59,15 +63,15 @@ st.markdown("---")
 # -----------------------------
 
 menu = st.sidebar.selectbox(
-    "Menú",
-    [
-        "Dashboard Ejecutivo",
-        "Registrar Productividad",
-        "Gestión de Técnicos",
-        "Análisis por Técnico",
-        "Informe Mensual",
-        "By RoelStar/2026"
-    ]
+"Menú",
+[
+"Dashboard Ejecutivo",
+"Registrar Productividad",
+"Gestión de Técnicos",
+"Análisis por Técnico",
+"Informe Mensual",
+"By RoelStar/2026"
+]
 )
 
 # -----------------------------
@@ -85,7 +89,7 @@ if menu == "Gestión de Técnicos":
         if nuevo != "":
             tecnicos.loc[len(tecnicos)] = [nuevo]
 
-            with pd.ExcelWriter(archivo) as writer:
+            with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
                 tecnicos.to_excel(writer, sheet_name="tecnicos", index=False)
                 datos.to_excel(writer, sheet_name="datos", index=False)
 
@@ -101,12 +105,7 @@ elif menu == "Registrar Productividad":
 
     st.subheader("Registro mensual")
 
-    meses = [
-        "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-        "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
-    ]
-
-    mes = st.selectbox("Mes", meses)
+    mes = st.selectbox("Mes", orden_meses)
 
     tecnico = st.selectbox("Técnico", tecnicos["Tecnico"])
 
@@ -114,18 +113,24 @@ elif menu == "Registrar Productividad":
 
     rep = st.number_input("Repuestos",0)
 
+    horas_prod = st.number_input("Horas productivas",0.0)
+
+    horas_lab = st.number_input("Horas laborales del mes",0.0)
+
     if st.button("Guardar"):
 
         nuevo = pd.DataFrame([{
             "Mes":mes,
             "Tecnico":tecnico,
             "Mano_Obra":mano,
-            "Repuestos":rep
+            "Repuestos":rep,
+            "Horas_Productivas":horas_prod,
+            "Horas_Laborales":horas_lab
         }])
 
         datos = pd.concat([datos,nuevo],ignore_index=True)
 
-        with pd.ExcelWriter(archivo) as writer:
+        with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
             tecnicos.to_excel(writer, sheet_name="tecnicos", index=False)
             datos.to_excel(writer, sheet_name="datos", index=False)
 
@@ -157,11 +162,24 @@ elif menu == "Dashboard Ejecutivo":
 
     meses_trabajados = datos["Mes"].nunique()
 
-    prod = datos.groupby("Tecnico")[["Mano_Obra","Repuestos"]].sum().reset_index()
+    prod = datos.groupby("Tecnico")[[
+        "Mano_Obra",
+        "Repuestos",
+        "Horas_Productivas",
+        "Horas_Laborales"
+    ]].sum().reset_index()
 
     meta_acumulada = META * meses_trabajados
 
     prod["Cumplimiento %"] = (prod["Mano_Obra"] / meta_acumulada) * 100
+
+    prod["Productividad %"] = (prod["Horas_Productivas"] / prod["Horas_Laborales"]) * 100
+
+    prod["$ por Hora"] = (prod["Mano_Obra"] / prod["Horas_Productivas"])
+
+    # -----------------------------
+    # PRODUCCION TECNICOS
+    # -----------------------------
 
     fig = px.bar(
         prod,
@@ -172,7 +190,14 @@ elif menu == "Dashboard Ejecutivo":
         color_continuous_scale="RdYlGn"
     )
 
+    fig.update_traces(texttemplate='$%{text:,.0f}', textposition='outside')
+    fig.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
+
     st.plotly_chart(fig,use_container_width=True)
+
+    # -----------------------------
+    # RANKING REPUESTOS
+    # -----------------------------
 
     st.subheader("Ranking Repuestos")
 
@@ -184,41 +209,64 @@ elif menu == "Dashboard Ejecutivo":
         color="Repuestos"
     )
 
+    fig2.update_traces(texttemplate='$%{text:,.0f}', textposition='outside')
+    fig2.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
+
     st.plotly_chart(fig2,use_container_width=True)
+
+    # -----------------------------
+    # PRODUCTIVIDAD
+    # -----------------------------
+
+    st.subheader("Productividad técnica")
+
+    fig3 = px.bar(
+        prod,
+        x="Tecnico",
+        y="Productividad %",
+        text="Productividad %",
+        color="Productividad %",
+        color_continuous_scale="Blues"
+    )
+
+    st.plotly_chart(fig3,use_container_width=True)
+
+    # -----------------------------
+    # EVOLUCION MENSUAL
+    # -----------------------------
 
     st.subheader("Evolución mensual")
 
     mes_data = datos.groupby("Mes")[["Mano_Obra","Repuestos"]].sum().reset_index()
 
-    fig3 = px.line(
+    mes_data["Mes"] = pd.Categorical(mes_data["Mes"],categories=orden_meses,ordered=True)
+
+    mes_data = mes_data.sort_values("Mes")
+
+    fig4 = px.line(
         mes_data,
         x="Mes",
         y=["Mano_Obra","Repuestos"],
         markers=True
     )
 
-    st.plotly_chart(fig3,use_container_width=True)
+    fig4.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
+
+    st.plotly_chart(fig4,use_container_width=True)
+
+    # -----------------------------
+    # TABLA ACUMULADA
+    # -----------------------------
 
     st.subheader("Tabla acumulada")
 
-    st.dataframe(prod.sort_values("Mano_Obra",ascending=False))
+    tabla = prod.copy()
 
-    # -----------------------------
-    # PARTICIPACIÓN REPUESTOS
-    # -----------------------------
+    tabla["Mano_Obra"] = tabla["Mano_Obra"].map('${:,.0f}'.format)
+    tabla["Repuestos"] = tabla["Repuestos"].map('${:,.0f}'.format)
+    tabla["$ por Hora"] = tabla["$ por Hora"].map('${:,.0f}'.format)
 
-    st.subheader("Participación técnicos en venta de repuestos")
-
-    fig_pie = px.pie(
-        prod,
-        names="Tecnico",
-        values="Repuestos",
-        hole=0.4
-    )
-
-    fig_pie.update_traces(textposition="inside", textinfo="percent+label")
-
-    st.plotly_chart(fig_pie, use_container_width=True)
+    st.dataframe(tabla.sort_values("Mano_Obra",ascending=False))
 
 # -----------------------------
 # INFORME MES A MES
@@ -228,12 +276,7 @@ elif menu == "Informe Mensual":
 
     st.subheader("Seguimiento mes a mes")
 
-    meses = [
-        "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-        "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
-    ]
-
-    for mes in meses:
+    for mes in orden_meses:
 
         datos_mes = datos[datos["Mes"] == mes]
 
@@ -247,7 +290,6 @@ elif menu == "Informe Mensual":
 
             st.dataframe(tabla)
 
-            # MANO DE OBRA
             fig = px.bar(
                 tabla,
                 x="Tecnico",
@@ -257,19 +299,10 @@ elif menu == "Informe Mensual":
                 color_continuous_scale="RdYlGn"
             )
 
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_traces(texttemplate='$%{text:,.0f}', textposition='outside')
+            fig.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
 
-            # REPUESTOS
-            fig_rep = px.bar(
-                tabla,
-                x="Tecnico",
-                y="Repuestos",
-                text="Repuestos",
-                color="Repuestos",
-                color_continuous_scale="Blues"
-            )
-
-            st.plotly_chart(fig_rep, use_container_width=True)  
+            st.plotly_chart(fig,use_container_width=True)
 
 # -----------------------------
 # ANALISIS TECNICO
@@ -288,11 +321,13 @@ elif menu == "Análisis por Técnico":
     fig = px.line(
         datos_t,
         x="Mes",
-        y=["Mano_Obra", "Repuestos"],
+        y=["Mano_Obra","Repuestos"],
         markers=True
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
+
+    st.plotly_chart(fig,use_container_width=True)
 
     total = datos_t["Mano_Obra"].sum()
 
