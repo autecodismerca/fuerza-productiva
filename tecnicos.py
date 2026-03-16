@@ -267,6 +267,26 @@ elif menu == "Dashboard Ejecutivo":
     tabla["$ por Hora"] = tabla["$ por Hora"].map('${:,.0f}'.format)
 
     st.dataframe(tabla.sort_values("Mano_Obra",ascending=False))
+    # -----------------------------
+    # PARTICIPACIÓN REPUESTOS
+    # -----------------------------
+
+    st.subheader("Participación técnicos en venta de repuestos")
+
+    fig_pie = px.pie(
+        prod,
+        names="Tecnico",
+        values="Repuestos",
+        hole=0.4
+    )
+
+    fig_pie.update_traces(
+        textposition="inside",
+        textinfo="percent+label"
+    )
+
+    st.plotly_chart(fig_pie, use_container_width=True)
+
 
 # -----------------------------
 # INFORME MES A MES
