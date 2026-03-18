@@ -7,7 +7,11 @@ from PIL import Image
 st.set_page_config(page_title="Dashboard Postventa", layout="wide")
 
 META = 6600000
-archivo = "datos_taller.xlsx"
+
+# 🔒 RUTA FIJA (NO SE BORRA NUNCA)
+ruta_base = r"C:\taller"
+os.makedirs(ruta_base, exist_ok=True)
+archivo = os.path.join(ruta_base, "datos_taller.xlsx")
 
 orden_meses = [
 "Enero","Febrero","Marzo","Abril","Mayo","Junio",
@@ -54,7 +58,7 @@ try:
 except:
     pass
 
-col2.markdown("<h2>Productividad Postventa</h2>",unsafe_allow_html=True)
+col2.markdown("<h2>Productividad Postventa Caribe</h2>",unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -110,11 +114,8 @@ elif menu == "Registrar Productividad":
     tecnico = st.selectbox("Técnico", tecnicos["Tecnico"])
 
     mano = st.number_input("Mano de obra",0)
-
     rep = st.number_input("Repuestos",0)
-
     horas_prod = st.number_input("Horas productivas",0.0)
-
     horas_lab = st.number_input("Horas laborales del mes",0.0)
 
     if st.button("Guardar"):
@@ -172,105 +173,39 @@ elif menu == "Dashboard Ejecutivo":
     meta_acumulada = META * meses_trabajados
 
     prod["Cumplimiento %"] = (prod["Mano_Obra"] / meta_acumulada) * 100
-
     prod["Productividad %"] = (prod["Horas_Productivas"] / prod["Horas_Laborales"]) * 100
-
     prod["$ por Hora"] = (prod["Mano_Obra"] / prod["Horas_Productivas"])
 
-    # -----------------------------
-    # PRODUCCION TECNICOS
-    # -----------------------------
+    st.subheader("Cumplimiento Presupuesto")
 
-    fig = px.bar(
-        prod,
-        x="Tecnico",
-        y="Mano_Obra",
-        color="Cumplimiento %",
-        text="Mano_Obra",
-        color_continuous_scale="RdYlGn"
-    )
-
+    fig = px.bar(prod,x="Tecnico",y="Mano_Obra",color="Cumplimiento %",text="Mano_Obra",color_continuous_scale="RdYlGn")
     fig.update_traces(texttemplate='$%{text:,.0f}', textposition='outside')
     fig.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
-
     st.plotly_chart(fig,use_container_width=True)
-
-    # -----------------------------
-    # RANKING REPUESTOS
-    # -----------------------------
 
     st.subheader("Ranking Repuestos")
 
-    fig2 = px.bar(
-        prod,
-        x="Tecnico",
-        y="Repuestos",
-        text="Repuestos",
-        color="Repuestos"
-    )
-
+    fig2 = px.bar(prod,x="Tecnico",y="Repuestos",text="Repuestos",color="Repuestos")
     fig2.update_traces(texttemplate='$%{text:,.0f}', textposition='outside')
     fig2.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
-
     st.plotly_chart(fig2,use_container_width=True)
-
-    # -----------------------------
-    # PRODUCTIVIDAD
-    # -----------------------------
 
     st.subheader("Productividad técnica")
 
-    fig3 = px.bar(
-        prod,
-        x="Tecnico",
-        y="Productividad %",
-        text="Productividad %",
-        color="Productividad %",
-        color_continuous_scale="Blues"
-    )
-
+    fig3 = px.bar(prod,x="Tecnico",y="Productividad %",text="Productividad %",color="Productividad %",color_continuous_scale="Blues")
     st.plotly_chart(fig3,use_container_width=True)
-
-    # -----------------------------
-    # EVOLUCION MENSUAL
-    # -----------------------------
 
     st.subheader("Evolución mensual")
 
     mes_data = datos.groupby("Mes")[["Mano_Obra","Repuestos"]].sum().reset_index()
-
     mes_data["Mes"] = pd.Categorical(mes_data["Mes"],categories=orden_meses,ordered=True)
-
     mes_data = mes_data.sort_values("Mes")
 
-    fig4 = px.line(
-        mes_data,
-        x="Mes",
-        y=["Mano_Obra","Repuestos"],
-        markers=True
-    )
-
+    fig4 = px.line(mes_data,x="Mes",y=["Mano_Obra","Repuestos"],markers=True)
     fig4.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
-
     st.plotly_chart(fig4,use_container_width=True)
 
-    # -----------------------------
-    # TABLA ACUMULADA
-    # -----------------------------
-
-    st.subheader("Tabla acumulada")
-
-    tabla = prod.copy()
-
-    tabla["Mano_Obra"] = tabla["Mano_Obra"].map('${:,.0f}'.format)
-    tabla["Repuestos"] = tabla["Repuestos"].map('${:,.0f}'.format)
-    tabla["$ por Hora"] = tabla["$ por Hora"].map('${:,.0f}'.format)
-
-    st.dataframe(tabla.sort_values("Mano_Obra",ascending=False))
-    # -----------------------------
-    # PARTICIPACIÓN REPUESTOS
-    # -----------------------------
-
+    # 🔥 PARTICIPACIÓN DE REPUESTOS (TORTA)
     st.subheader("Participación técnicos en venta de repuestos")
 
     fig_pie = px.pie(
@@ -286,10 +221,8 @@ elif menu == "Dashboard Ejecutivo":
     )
 
     st.plotly_chart(fig_pie, use_container_width=True)
-
-
 # -----------------------------
-# INFORME MES A MES
+# INFORME MENSUAL (AJUSTADO)
 # -----------------------------
 
 elif menu == "Informe Mensual":
@@ -304,11 +237,24 @@ elif menu == "Informe Mensual":
 
             st.markdown(f"## {mes}")
 
-            tabla = datos_mes.groupby("Tecnico")[["Mano_Obra","Repuestos"]].sum().reset_index()
+            tabla = datos_mes.groupby("Tecnico")[[
+                "Mano_Obra",
+                "Repuestos",
+                "Horas_Productivas",
+                "Horas_Laborales"
+            ]].sum().reset_index()
 
             tabla["Cumplimiento %"] = (tabla["Mano_Obra"] / META) * 100
+            tabla["Productividad %"] = (tabla["Horas_Productivas"] / tabla["Horas_Laborales"]) * 100
 
-            st.dataframe(tabla)
+            # FORMATO BONITO
+            tabla_mostrar = tabla.copy()
+            tabla_mostrar["Mano_Obra"] = tabla_mostrar["Mano_Obra"].map('${:,.0f}'.format)
+            tabla_mostrar["Repuestos"] = tabla_mostrar["Repuestos"].map('${:,.0f}'.format)
+            tabla_mostrar["Cumplimiento %"] = tabla_mostrar["Cumplimiento %"].map('{:.1f}%'.format)
+            tabla_mostrar["Productividad %"] = tabla_mostrar["Productividad %"].map('{:.1f}%'.format)
+
+            st.dataframe(tabla_mostrar)
 
             fig = px.bar(
                 tabla,
@@ -338,21 +284,12 @@ elif menu == "Análisis por Técnico":
         st.warning("Sin datos")
         st.stop()
 
-    fig = px.line(
-        datos_t,
-        x="Mes",
-        y=["Mano_Obra","Repuestos"],
-        markers=True
-    )
-
+    fig = px.line(datos_t,x="Mes",y=["Mano_Obra","Repuestos"],markers=True)
     fig.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
-
     st.plotly_chart(fig,use_container_width=True)
 
     total = datos_t["Mano_Obra"].sum()
-
     meses_trabajados = datos["Mes"].nunique()
-
     meta_acumulada = META * meses_trabajados
 
     cumplimiento = (total / meta_acumulada) * 100
