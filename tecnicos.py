@@ -149,18 +149,11 @@ elif menu == "Dashboard Ejecutivo":
         st.warning("No hay datos")
         st.stop()
 
+    # 🔹 TOTALES GENERALES
     total_mo = datos["Mano_Obra"].sum()
     total_rep = datos["Repuestos"].sum()
 
-    col1,col2,col3,col4 = st.columns(4)
-
-    col1.metric("Mano obra total",f"${total_mo:,.0f}")
-    col2.metric("Repuestos totales",f"${total_rep:,.0f}")
-    col3.metric("Técnicos activos",len(tecnicos))
-    col4.metric("Meta mensual técnico",f"${META:,.0f}")
-
-    st.divider()
-
+    # 🔹 AGRUPACIÓN GENERAL
     meses_trabajados = datos["Mes"].nunique()
 
     prod = datos.groupby("Tecnico")[[
@@ -174,11 +167,66 @@ elif menu == "Dashboard Ejecutivo":
 
     prod["Cumplimiento %"] = (prod["Mano_Obra"] / meta_acumulada) * 100
     prod["Productividad %"] = (prod["Horas_Productivas"] / prod["Horas_Laborales"]) * 100
-    prod["$ por Hora"] = (prod["Mano_Obra"] / prod["Horas_Productivas"])
+
+    # 🔥 PROMEDIOS (REFERENCIA)
+    prom_cumplimiento = prod["Cumplimiento %"].mean()
+    prom_productividad = prod["Productividad %"].mean()
+
+    # 🔥 MÉTRICAS REALES DEL NEGOCIO (CLAVE GERENCIAL)
+    total_horas_prod = prod["Horas_Productivas"].sum()
+    total_horas_lab = prod["Horas_Laborales"].sum()
+    total_tecnicos = prod["Tecnico"].nunique()
+
+    cumplimiento_real = (total_mo / (META * meses_trabajados * total_tecnicos)) * 100
+    productividad_real = (total_horas_prod / total_horas_lab) * 100
+
+    # 🔹 MÉTRICAS (ORDEN GERENCIAL)
+    col1,col2,col3,col4,col5,col6 = st.columns(6)
+
+    col1.metric("💰 Mano obra total",f"${total_mo:,.0f}")
+    col2.metric("🔧 Repuestos totales",f"${total_rep:,.0f}")
+    col3.metric("👨‍🔧 Técnicos",total_tecnicos)
+    col4.metric("🎯 Meta mensual",f"${META:,.0f}")
+
+    # 🔥 IMPORTANTES (NEGOCIO REAL)
+    col5.metric("📊 Cumplimiento REAL", f"{cumplimiento_real:.1f}%")
+    col6.metric("⚡ Productividad REAL", f"{productividad_real:.1f}%")
+
+    # 🔹 REFERENCIA (PEQUEÑA)
+    st.caption(f"Promedio técnicos → Cumplimiento: {prom_cumplimiento:.1f}% | Productividad: {prom_productividad:.1f}%")
+
+    st.divider()
+
+    # 🔥 CUADRO TOTALIZADO
+    st.subheader("Resumen Total por Técnico")
+
+    tabla_total = prod.copy()
+
+    tabla_mostrar = tabla_total.copy()
+
+    tabla_mostrar["Mano_Obra"] = tabla_mostrar["Mano_Obra"].map('${:,.0f}'.format)
+    tabla_mostrar["Repuestos"] = tabla_mostrar["Repuestos"].map('${:,.0f}'.format)
+    tabla_mostrar["Cumplimiento %"] = tabla_mostrar["Cumplimiento %"].map('{:.1f}%'.format)
+    tabla_mostrar["Productividad %"] = tabla_mostrar["Productividad %"].map('{:.1f}%'.format)
+
+    st.dataframe(tabla_mostrar, use_container_width=True)
+
+    st.divider()
+
+    # -----------------------------
+    # GRÁFICOS
+    # -----------------------------
 
     st.subheader("Cumplimiento Presupuesto")
 
-    fig = px.bar(prod,x="Tecnico",y="Mano_Obra",color="Cumplimiento %",text="Mano_Obra",color_continuous_scale="RdYlGn")
+    fig = px.bar(
+        prod,
+        x="Tecnico",
+        y="Mano_Obra",
+        color="Cumplimiento %",
+        text="Mano_Obra",
+        color_continuous_scale="RdYlGn"
+    )
     fig.update_traces(texttemplate='$%{text:,.0f}', textposition='outside')
     fig.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
     st.plotly_chart(fig,use_container_width=True)
@@ -192,7 +240,14 @@ elif menu == "Dashboard Ejecutivo":
 
     st.subheader("Productividad técnica")
 
-    fig3 = px.bar(prod,x="Tecnico",y="Productividad %",text="Productividad %",color="Productividad %",color_continuous_scale="Blues")
+    fig3 = px.bar(
+        prod,
+        x="Tecnico",
+        y="Productividad %",
+        text="Productividad %",
+        color="Productividad %",
+        color_continuous_scale="Blues"
+    )
     st.plotly_chart(fig3,use_container_width=True)
 
     st.subheader("Evolución mensual")
@@ -205,7 +260,6 @@ elif menu == "Dashboard Ejecutivo":
     fig4.update_layout(yaxis_tickprefix="$", yaxis_tickformat=",")
     st.plotly_chart(fig4,use_container_width=True)
 
-    # 🔥 PARTICIPACIÓN DE REPUESTOS (TORTA)
     st.subheader("Participación técnicos en venta de repuestos")
 
     fig_pie = px.pie(
@@ -215,12 +269,10 @@ elif menu == "Dashboard Ejecutivo":
         hole=0.4
     )
 
-    fig_pie.update_traces(
-        textposition="inside",
-        textinfo="percent+label"
-    )
+    fig_pie.update_traces(textposition="inside", textinfo="percent+label")
 
-    st.plotly_chart(fig_pie, use_container_width=True)
+    st.plotly_chart(fig_pie, use_container_width=True)                                                               
+
 # -----------------------------
 # INFORME MENSUAL (AJUSTADO)
 # -----------------------------
@@ -247,15 +299,38 @@ elif menu == "Informe Mensual":
             tabla["Cumplimiento %"] = (tabla["Mano_Obra"] / META) * 100
             tabla["Productividad %"] = (tabla["Horas_Productivas"] / tabla["Horas_Laborales"]) * 100
 
-            # FORMATO BONITO
+            # -----------------------------
+            # TABLA FORMATEADA
+            # -----------------------------
             tabla_mostrar = tabla.copy()
+
             tabla_mostrar["Mano_Obra"] = tabla_mostrar["Mano_Obra"].map('${:,.0f}'.format)
             tabla_mostrar["Repuestos"] = tabla_mostrar["Repuestos"].map('${:,.0f}'.format)
             tabla_mostrar["Cumplimiento %"] = tabla_mostrar["Cumplimiento %"].map('{:.1f}%'.format)
             tabla_mostrar["Productividad %"] = tabla_mostrar["Productividad %"].map('{:.1f}%'.format)
 
-            st.dataframe(tabla_mostrar)
+            st.dataframe(tabla_mostrar, use_container_width=True)
 
+            # 🔥 RESUMEN REAL DEL MES (AQUÍ VA)
+            total_mo_mes = tabla["Mano_Obra"].sum()
+            total_horas_prod_mes = tabla["Horas_Productivas"].sum()
+            total_horas_lab_mes = tabla["Horas_Laborales"].sum()
+
+            cantidad_tecnicos_mes = tabla["Tecnico"].nunique()
+
+            cumplimiento_real = (total_mo_mes / (META * cantidad_tecnicos_mes)) * 100
+            productividad_real = (total_horas_prod_mes / total_horas_lab_mes) * 100
+
+            c1, c2 = st.columns(2)
+
+            c1.metric("Cumplimiento real del mes", f"{cumplimiento_real:.1f}%")
+            c2.metric("Productividad real del mes", f"{productividad_real:.1f}%")
+
+            st.divider()
+
+            # -----------------------------
+            # GRÁFICO
+            # -----------------------------
             fig = px.bar(
                 tabla,
                 x="Tecnico",
